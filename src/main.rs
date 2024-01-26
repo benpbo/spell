@@ -1,4 +1,4 @@
-use std::fs::read_to_string;
+use std::{cmp::min, fs::read_to_string};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args();
@@ -31,7 +31,7 @@ fn spell_check<'a>(word: &str, dictionary: &'a [String]) -> Vec<SpellCheckSugges
     let mut results: Vec<SpellCheckSuggestion> = dictionary
         .iter()
         .map(|correct_word| SpellCheckSuggestion {
-            distance: wagner_fischer(word, &correct_word),
+            distance: wagner_fischer(word, correct_word),
             correct_word,
         })
         .collect();
@@ -40,32 +40,30 @@ fn spell_check<'a>(word: &str, dictionary: &'a [String]) -> Vec<SpellCheckSugges
     results
 }
 
-fn wagner_fischer(s1: &str, s2: &str) -> usize {
-    let s1: Vec<char> = s1.chars().collect();
-    let s2: Vec<char> = s2.chars().collect();
-    let (s1, s2) = if s1.len() > s2.len() {
-        (s1, s2)
+fn wagner_fischer(word1: &str, word2: &str) -> usize {
+    let word1: Vec<char> = word1.chars().collect();
+    let word2: Vec<char> = word2.chars().collect();
+    let (word1, word2) = if word1.len() > word2.len() {
+        (word1, word2)
     } else {
-        (s2, s1)
+        (word2, word1)
     };
 
-    let mut current_row: Vec<usize> = (0..s1.len() + 1).collect();
-    for i in 1..s2.len() + 1 {
-        let previous_row = current_row.clone();
-        current_row = vec![0; s1.len() + 1];
-        current_row[0] = i;
+    let mut current_row: Vec<usize> = (0..word1.len() + 1).collect();
+    for (i, c) in word2.iter().enumerate() {
+        let previous_row = current_row;
+        current_row = vec![0; word1.len() + 1];
+        current_row[0] = i + 1;
         for j in 1..current_row.len() {
-            let (add, delete, change) = (
-                previous_row[j] + 1,
-                current_row[j - 1] + 1,
-                previous_row[j - 1] + if s1[j - 1] != s2[i - 1] { 1 } else { 0 },
-            );
+            let add = previous_row[j] + 1;
+            let delete = current_row[j - 1] + 1;
+            let change = previous_row[j - 1] + if word1[j - 1] == *c { 0 } else { 1 };
 
-            current_row[j] = *[add, delete, change].iter().min().unwrap();
+            current_row[j] = min(min(add, delete), change);
         }
     }
 
-    current_row[s1.len()]
+    current_row[word1.len()]
 }
 
 fn load_dictionary(filename: &str) -> std::io::Result<Vec<String>> {
